@@ -16,3 +16,14 @@ Run:
 ./mvnw -q compile exec:java
 ./mvnw test
 ```
+
+Commands:
+
+```
+list | search <text>
+play <id> | pause | resume | stop | next
+queue [<id>] | order sequential|shuffle|repeat
+add <effect> | remove <effect> | effects | undo
+now | history | exit
+effects: volume_boost, fade_in, echo, bass_boost
+```
