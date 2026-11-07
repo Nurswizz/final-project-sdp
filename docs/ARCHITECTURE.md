@@ -10,16 +10,16 @@ A small music player. The user searches the library, plays a track, hears it wit
 
 ## 2. Patterns
 
-| Pattern | Where | What it does in the project | Owner (proposal) |
+| Pattern | Where | What it does in the project | Owner |
 |---|---|---|---|
-| Facade | `facade` | `MusicStreamingFacade` gives the UI one simple API over the catalog, lyrics, audio library and player | Nursultan Tumenbay |
-| Observer | `events` | the player publishes playback events, listeners (lyrics display, now playing bar, history) react to them | Abylai Utemis |
-| Decorator | `audio.effects` | effects wrap an `AudioStream` and change its samples, they can be stacked in any order at runtime | Nurshakh Sarybek |
-| Factory | `audio.effects` | `EffectFactory` turns an `EffectType` into the matching decorator, so `EffectChain` does not know the concrete effect classes | Nurshakh Sarybek |
-| Strategy | `playback.order` | `PlaybackOrder` decides which track of the queue plays next: sequential, shuffle or repeat one | Abylai Utemis |
-| Command | `command` | every user action is a `Command` object, `CommandHistory` keeps them so effects and pause can be undone | Nursultan Tumenbay |
+| Facade | `facade` | `MusicStreamingFacade` gives the UI one simple API over the catalog, lyrics, audio library and player | Abylai Utemis |
+| Observer | `events` | the player publishes playback events, listeners (lyrics display, now playing bar, history) react to them | Nurshakh Sarybek |
+| Decorator | `audio.effects` | effects wrap an `AudioStream` and change its samples, they can be stacked in any order at runtime | Nursultan Tumenbay |
+| Factory | `audio.effects` | `EffectFactory` turns an `EffectType` into the matching decorator, so `EffectChain` does not know the concrete effect classes | Nursultan Tumenbay |
+| Strategy | `playback.order` | `PlaybackOrder` decides which track of the queue plays next: sequential, shuffle or repeat one | Nurshakh Sarybek |
+| Command | `command` | every user action is a `Command` object, `CommandHistory` keeps them so effects and pause can be undone | Abylai Utemis |
 
-The owners are only a proposal, the team can swap them. Every student owns two patterns, as the defense requirements ask
+Every student owns two patterns, as the defense requirements ask
 
 ## 3. Folder structure
 
@@ -93,7 +93,7 @@ Change an effect while the music plays: `facade.addEffect(EffectType.ECHO)` make
 
 ## 5. Contracts
 
-### Facade (Nursultan): `facade.MusicStreamingFacade`
+### Facade (Abylai): `facade.MusicStreamingFacade`
 
 ```java
 List<Track> search(String query)
@@ -116,10 +116,10 @@ Subsystems behind it (the UI never touches them directly):
 
 - `TrackCatalog` (Abylai): list of tracks, search by title or artist
 - `LyricsRepository` + `LrcParser` (Abylai): reads `resources/lyrics/<trackId>.lrc` (lines like `[00:12.50] text`)
-- `AudioLibrary` (Nurshakh): opens the raw `AudioStream` of a track
-- `Player` (Nursultan): plays a stream, keeps the position, publishes events
+- `AudioLibrary` (Abylai): opens the raw `AudioStream` of a track
+- `Player` (Nurshakh): plays a stream, keeps the position, publishes events
 
-### Decorator (Nurshakh): `audio`, `audio.effects`
+### Decorator (Nursultan): `audio`, `audio.effects`
 
 - `AudioStream` (component, done): `int sampleRate()`, `int read(float[] buffer)` returns how many samples were read or -1 at the end
 - `ToneTrackStream` (concrete component): generates the music of a track from notes (sine waves), so we need no audio files
@@ -132,12 +132,12 @@ Subsystems behind it (the UI never touches them directly):
 - `EffectChain`: keeps the list of active `EffectType`s and wraps a raw stream in them
 - `AudioOutput` (done): `SpeakerOutput` plays through `javax.sound.sampled`, `SilentOutput` is for tests
 
-### Factory (Nurshakh): `audio.effects`
+### Factory (Nursultan): `audio.effects`
 
 - `EffectFactory`: `AudioStream create(EffectType type, AudioStream inner)` returns the matching decorator
 - `EffectChain` calls only the factory, a new effect needs a new `EffectType` and one new case in the factory
 
-### Observer (Abylai): `events`, `events.listeners`
+### Observer (Nurshakh): `events`, `events.listeners`
 
 - `PlaybackSubject` (subject, done): `subscribe` and `unsubscribe` per `PlaybackEventType`
 - `PlaybackListener` (observer, done): `onEvent(PlaybackEvent)`
@@ -148,13 +148,13 @@ Subsystems behind it (the UI never touches them directly):
   - `NowPlayingBar`: shows title, artist and a progress bar `[#####-----] 1:12 / 3:05`
   - `ListeningHistory`: remembers finished tracks
 
-### Strategy (Abylai): `playback.order`
+### Strategy (Nurshakh): `playback.order`
 
 - `PlaybackOrder` (strategy): `OptionalInt next(int current, int size)` returns the index of the next track or empty at the end of the queue
 - concrete strategies: `SequentialOrder`, `ShuffleOrder` (gets its `Random` through the constructor, so tests are stable), `RepeatOneOrder`
 - `PlaybackQueue` (context): keeps the tracks and asks the active `PlaybackOrder` for the next one
 
-### Command (Nursultan): `command`
+### Command (Abylai): `command`
 
 - `Command`: `void execute()`, `void undo()`
 - `CommandHistory`: runs a command, keeps it on a stack, `undo()` takes the last one back
@@ -173,9 +173,9 @@ Subsystems behind it (the UI never touches them directly):
 
 ## 7. Plan
 
-1. everybody: read this file, agree on the owners
+1. everybody: read this file
 2. each owner: write the classes of the pattern and tests in their package
-3. Nursultan: facade and console UI once the parts are ready, the facade can be written earlier with fake subsystems
+3. Abylai: facade and console UI once the parts are ready, the facade can be written earlier with fake subsystems
 4. all: run together, take screenshots into `docs/screenshots`, draw class diagrams into `docs/uml`
 5. report (pdf): introduction, body (one section per pattern with code, uml and screenshots), conclusion, further work
 
