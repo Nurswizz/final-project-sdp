@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDP MP3</title>
+<style>
+  html, body { height: 100%; margin: 0; background: #ffffff; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  canvas { width: 384px; height: 636px; image-rendering: pixelated; cursor: pointer; }
+  p { margin: 0; font: 11px/1.4 monospace; color: #a3a3ad; text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="player" width="128" height="212"></canvas>
+<p>wheel: menu, prev, next, play / pause &nbsp;·&nbsp; keys: effects, order, undo<br>
+space play / pause &nbsp;·&nbsp; arrows prev / next &nbsp;·&nbsp; m menu &nbsp;·&nbsp; 1-4 effects &nbsp;·&nbsp; o order &nbsp;·&nbsp; z undo</p>
+<script>
+const SCALE = 3;
+const C = {
+  ink: '#1d1d24', body: '#e4e4ea', light: '#ffffff', shade: '#c4c4cc', bezel: '#2a2d36',
+  lcd: '#bcd8a3', lcdInk: '#22331b', lcdSoft: '#4f6b42', key: '#d6d6de', keyHover: '#eeeef3',
+  keyDown: '#b6b6c0', wheel: '#fbfbfd', button: '#d8d8e0', brand: '#9a9aa6'
+};
+
+const GLYPHS = {
+  A:'01110 10001 10001 11111 10001 10001 10001', B:'11110 10001 10001 11110 10001 10001 11110',
+  C:'01110 10001 10000 10000 10000 10001 01110', D:'11110 10001 10001 10001 10001 10001 11110',
+  E:'11111 10000 10000 11110 10000 10000 11111', F:'11111 10000 10000 11110 10000 10000 10000',
+  G:'01110 10001 10000 10111 10001 10001 01111', H:'10001 10001 10001 11111 10001 10001 10001',
+  I:'01110 00100 00100 00100 00100 00100 01110', J:'00111 00010 00010 00010 00010 10010 01100',
+  K:'10001 10010 10100 11000 10100 10010 10001', L:'10000 10000 10000 10000 10000 10000 11111',
+  M:'10001 11011 10101 10101 10001 10001 10001', N:'10001 10001 11001 10101 10011 10001 10001',
+  O:'01110 10001 10001 10001 10001 10001 01110', P:'11110 10001 10001 11110 10000 10000 10000',
+  Q:'01110 10001 10001 10001 10101 10010 01101', R:'11110 10001 10001 11110 10100 10010 10001',
+  S:'01111 10000 10000 01110 00001 00001 11110', T:'11111 00100 00100 00100 00100 00100 00100',
+  U:'10001 10001 10001 10001 10001 10001 01110', V:'10001 10001 10001 10001 10001 01010 00100',
+  W:'10001 10001 10001 10101 10101 10101 01010', X:'10001 10001 01010 00100 01010 10001 10001',
+  Y:'10001 10001 10001 01010 00100 00100 00100', Z:'11111 00001 00010 00100 01000 10000 11111',
+  0:'01110 10001 10011 10101 11001 10001 01110', 1:'00100 01100 00100 00100 00100 00100 01110',
+  2:'01110 10001 00001 00010 00100 01000 11111', 3:'11111 00010 00100 00010 00001 10001 01110',
+  4:'00010 00110 01010 10010 11111 00010 00010', 5:'11111 10000 11110 00001 00001 10001 01110',
+  6:'00110 01000 10000 11110 10001 10001 01110', 7:'11111 00001 00010 00100 01000 01000 01000',
+  8:'01110 10001 10001 01110 10001 10001 01110', 9:'01110 10001 10001 01111 00001 00010 01100',
+  ':':'00000 01100 01100 00000 01100 01100 00000', '-':'00000 00000 00000 11111 00000 00000 00000',
+  '/':'00000 00001 00010 00100 01000 10000 00000', '.':'00000 00000 00000 00000 00000 01100 01100',
+  ',':'00000 00000 00000 00000 01100 00100 01000', '!':'00100 00100 00100 00100 00100 00000 00100',
+  '?':'01110 10001 00001 00010 00100 00000 00100', "'":'00100 00100 01000 00000 00000 00000 00000',
+  '(':'00010 00100 01000 01000 01000 00100 00010', ')':'01000 00100 00010 00010 00010 00100 01000',
+  '>':'01000 00100 00010 00001 00010 00100 01000', '<':'00010 00100 01000 10000 01000 00100 00010',
+  '+':'00000 00100 00100 11111 00100 00100 00000', '&':'01100 10010 10100 01000 10101 10010 01101',
+  ' ':'00000 00000 00000 00000 00000 00000 00000'
+};
+
+const ICONS = {
+  play: '10000 11000 11100 11110 11100 11000 10000',
+  pause: '11011 11011 11011 11011 11011 11011 11011',
+  stop: '00000 11111 11111 11111 11111 11111 00000',
+  next: '1001001 1101101 1111111 1101101 1001001',
+  prev: '1001001 1011011 1111111 1011011 1001001',
+  playPause: '100011011 110011011 111011011 110011011 100011011',
+  sequential: '00000 00100 00010 11111 00010 00100 00000',
+  shuffle: '10001 01010 00100 01010 10001 00000 00000',
+  repeat: '01111 10001 10001 10001 11110 00000 00000',
+  undo: '00100 01000 11110 01001 00001 00001 00110'
+};
+
+const EFFECTS = [
+  { key: 'V', name: 'VOLUME_BOOST', label: 'VOLUME BOOST', short: 'VOL' },
+  { key: 'F', name: 'FADE_IN', label: 'FADE IN', short: 'FADE' },
+  { key: 'E', name: 'ECHO', label: 'ECHO', short: 'ECHO' },
+  { key: 'B', name: 'BASS_BOOST', label: 'BASS BOOST', short: 'BASS' }
+];
+const ORDER_LABEL = { sequential: 'SEQ', shuffle: 'SHF', repeat: 'RPT' };
+
+const canvas = document.getElementById('player');
+const ctx = canvas.getContext('2d');
+const WHEEL = { x: 64, y: 146, outer: 36, inner: 12 };
+const KEYS = [...EFFECTS.map(e => ({ id: 'fx:' + e.name, effect: e })), { id: 'order' }, { id: 'undo' }]
+  .map((k, i) => ({ ...k, x: 9 + i * 19, y: 189, w: 16, h: 13 }));
+
+let state = null;
+let online = true;
+let menu = location.hash === '#menu';
+let selected = 0;
+let hover = null;
+let pressed = null;
+
+function px(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
+}
+
+function bitmap(rows, x, y, color) {
+  x = Math.round(x);
+  y = Math.round(y);
+  rows.split(' ').forEach((row, dy) => {
+    [...row].forEach((bit, dx) => { if (bit === '1') px(x + dx, y + dy, 1, 1, color); });
+  });
+}
+
+function text(value, x, y, color) {
+  [...value.toUpperCase()].forEach((ch, i) => bitmap(GLYPHS[ch] || GLYPHS['?'], x + i * 6, y, color));
+}
+
+function textWidth(value) {
+  return value.length * 6 - 1;
+}
+
+function fit(value, chars) {
+  return value.length <= chars ? value : value.slice(0, chars - 1) + '.';
+}
+
+function wrap(value, chars) {
+  const lines = [''];
+  value.toUpperCase().split(' ').forEach(word => {
+    const last = lines[lines.length - 1];
+    if ((last + ' ' + word).trim().length <= chars) {
+      lines[lines.length - 1] = (last + ' ' + word).trim();
+    } else {
+      lines.push(fit(word, chars));
+    }
+  });
+  return lines;
+}
+
+function roundRect(x, y, w, h, r, color) {
+  for (let row = 0; row < h; row++) {
+    const edge = Math.min(row, h - 1 - row);
+    const inset = edge < r ? r - Math.round(Math.sqrt(r * r - (r - edge - 0.5) ** 2)) : 0;
+    px(x + inset, y + row, w - 2 * inset, 1, color);
+  }
+}
+
+function framed(x, y, w, h, r, fill, line) {
+  roundRect(x, y, w, h, r, line);
+  roundRect(x + 1, y + 1, w - 2, h - 2, Math.max(r - 1, 0), fill);
+}
+
+function disc(cx, cy, r, color) {
+  for (let dy = -r; dy < r; dy++) {
+    for (let dx = -r; dx < r; dx++) {
+      if ((dx + 0.5) ** 2 + (dy + 0.5) ** 2 <= r * r) px(cx + dx, cy + dy, 1, 1, color);
+    }
+  }
+}
+
+function time(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function drawBody() {
+  framed(4, 4, 120, 204, 6, C.body, C.ink);
+  px(7, 6, 110, 1, C.light);
+  px(5, 9, 1, 194, C.light);
+  px(9, 205, 110, 1, C.shade);
+  px(122, 10, 1, 192, C.shade);
+  framed(12, 14, 104, 86, 3, C.bezel, C.ink);
+  roundRect(15, 17, 98, 80, 2, C.lcd);
+  text('SDP MP3', 64 - textWidth('SDP MP3') / 2, 102, C.brand);
+}
+
+function dotted(y) {
+  for (let x = 18; x <= 110; x += 2) px(x, y, 1, 1, C.lcdSoft);
+}
+
+function drawNowPlaying() {
+  const playing = state.playing && !state.paused;
+  bitmap(playing ? ICONS.play : state.paused ? ICONS.pause : ICONS.stop, 18, 20, C.lcdInk);
+  text(playing ? 'PLAYING' : state.paused ? 'PAUSED' : 'STOPPED', 26, 20, C.lcdInk);
+  const order = ORDER_LABEL[state.order] || 'SEQ';
+  text(order, 111 - textWidth(order), 20, C.lcdSoft);
+  dotted(29);
+  const track = state.current;
+  if (!track) {
+    text('NOTHING YET', 18, 34, C.lcdInk);
+    text('PRESS PLAY', 18, 44, C.lcdSoft);
+  } else {
+    text(fit(track.title, 15), 18, 33, C.lcdInk);
+    text(fit(track.artist, 15), 18, 42, C.lcdSoft);
+    const total = track.durationMillis;
+    const done = Math.min(state.positionMillis, total);
+    px(18, 52, 93, 5, C.lcdInk);
+    px(19, 53, 91, 3, C.lcd);
+    px(19, 53, Math.round(91 * done / total), 3, C.lcdInk);
+    text(time(done), 18, 60, C.lcdInk);
+    text(time(total), 111 - textWidth(time(total)), 60, C.lcdInk);
+    wrap(state.lyric || '', 15).slice(0, 2).forEach((line, i) => text(line, 18, 69 + i * 8, C.lcdInk));
+  }
+  dotted(86);
+  text(fit(footer(), 15), 18, 88, C.lcdSoft);
+}
+
+function drawMenu() {
+  text('LIBRARY', 18, 20, C.lcdInk);
+  const count = (selected + 1) + '/' + state.tracks.length;
+  text(count, 111 - textWidth(count), 20, C.lcdSoft);
+  dotted(29);
+  state.tracks.slice(0, 5).forEach((track, i) => {
+    const y = 32 + i * 10;
+    const current = state.current && state.current.id === track.id;
+    const label = fit((current ? '>' : ' ') + track.title, 15);
+    if (i === selected) {
+      px(17, y - 1, 95, 9, C.lcdInk);
+      text(label, 18, y, C.lcd);
+    } else {
+      text(label, 18, y, C.lcdInk);
+    }
+  });
+  dotted(86);
+  text(fit(footer('CENTER: PLAY'), 15), 18, 88, C.lcdSoft);
+}
+
+function footer(fallback) {
+  if (hover) return hoverLabel(hover);
+  if (fallback) return fallback;
+  const active = EFFECTS.filter(e => state.effects.includes(e.name)).map(e => e.short);
+  return active.length ? 'FX ' + active.join('+') : 'FX OFF';
+}
+
+function hoverLabel(id) {
+  if (id.startsWith('fx:')) return EFFECTS.find(e => 'fx:' + e.name === id).label;
+  return {
+    menu: 'MENU', prev: menu ? 'UP' : 'PREVIOUS', next: menu ? 'DOWN' : 'NEXT', playpause: 'PLAY / PAUSE',
+    center: menu ? 'PLAY TRACK' : 'OPEN LIBRARY', order: 'ORDER ' + (ORDER_LABEL[state.order] || 'SEQ'),
+    undo: 'UNDO'
+  }[id] || '';
+}
+
+function drawWheel() {
+  disc(WHEEL.x, WHEEL.y, WHEEL.outer, C.ink);
+  disc(WHEEL.x, WHEEL.y, WHEEL.outer - 1, C.wheel);
+  ['menu', 'prev', 'next', 'playpause'].filter(id => id === hover || id === pressed).forEach(id => shadeSector(id));
+  disc(WHEEL.x, WHEEL.y, WHEEL.inner, C.ink);
+  disc(WHEEL.x, WHEEL.y, WHEEL.inner - 1, pressed === 'center' ? C.keyDown : hover === 'center' ? C.keyHover : C.button);
+  text('MENU', WHEEL.x - textWidth('MENU') / 2, WHEEL.y - 31, C.ink);
+  bitmap(ICONS.prev, WHEEL.x - 31, WHEEL.y - 2, C.ink);
+  bitmap(ICONS.next, WHEEL.x + 25, WHEEL.y - 2, C.ink);
+  bitmap(ICONS.playPause, WHEEL.x - 4, WHEEL.y + 24, C.ink);
+}
+
+function shadeSector(id) {
+  const color = id === pressed ? C.keyDown : C.keyHover;
+  for (let dy = -WHEEL.outer + 2; dy < WHEEL.outer - 2; dy++) {
+    for (let dx = -WHEEL.outer + 2; dx < WHEEL.outer - 2; dx++) {
+      const d = Math.hypot(dx + 0.5, dy + 0.5);
+      if (d > WHEEL.inner + 1 && d < WHEEL.outer - 2 && sector(dx + 0.5, dy + 0.5) === id) {
+        px(WHEEL.x + dx, WHEEL.y + dy, 1, 1, color);
+      }
+    }
+  }
+}
+
+function sector(dx, dy) {
+  if (Math.abs(dy) >= Math.abs(dx)) return dy < 0 ? 'menu' : 'playpause';
+  return dx < 0 ? 'prev' : 'next';
+}
+
+function drawKeys() {
+  KEYS.forEach(k => {
+    const active = k.effect && state.effects.includes(k.effect.name);
+    const fill = k.id === pressed ? C.keyDown : active ? C.lcd : k.id === hover ? C.keyHover : C.key;
+    framed(k.x, k.y, k.w, k.h, 2, fill, C.ink);
+    if (k.effect) {
+      text(k.effect.key, k.x + 6, k.y + 3, C.ink);
+    } else if (k.id === 'order') {
+      bitmap(ICONS[state.order] || ICONS.sequential, k.x + 6, k.y + 3, C.ink);
+    } else {
+      bitmap(ICONS.undo, k.x + 6, k.y + 3, C.ink);
+    }
+  });
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBody();
+  if (!state) {
+    text(online ? 'LOADING' : 'NO SERVER', 18, 52, C.lcdInk);
+  } else if (menu) {
+    drawMenu();
+  } else {
+    drawNowPlaying();
+  }
+  if (state) {
+    drawWheel();
+    drawKeys();
+  }
+}
+
+async function call(action, query = '') {
+  try {
+    const response = await fetch('/api/' + action + query, { method: action === 'state' ? 'GET' : 'POST' });
+    const json = await response.json();
+    if (!json.error) {
+      const first = state === null;
+      state = json;
+      if (first) selectCurrent();
+    }
+    online = true;
+  } catch (e) {
+    online = false;
+  }
+  draw();
+}
+
+function press(id) {
+  pressed = id;
+  draw();
+  setTimeout(() => { pressed = null; draw(); }, 120);
+  if (id.startsWith('fx:')) return call('effect', '?name=' + id.slice(3));
+  switch (id) {
+    case 'menu': menu = !menu; selectCurrent(); return draw();
+    case 'center':
+      if (menu) { menu = false; return call('play', '?id=' + state.tracks[selected].id); }
+      menu = true; selectCurrent(); return draw();
+    case 'prev': return menu ? move(-1) : call('prev');
+    case 'next': return menu ? move(1) : call('next');
+    case 'playpause': return call('playpause');
+    case 'order': return call('order');
+    case 'undo': return call('undo');
+  }
+}
+
+function move(step) {
+  selected = (selected + step + state.tracks.length) % state.tracks.length;
+  draw();
+}
+
+function selectCurrent() {
+  if (state && state.current) selected = Math.max(0, state.tracks.findIndex(t => t.id === state.current.id));
+}
+
+function hit(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * canvas.width / rect.width;
+  const y = (event.clientY - rect.top) * canvas.height / rect.height;
+  const d = Math.hypot(x - WHEEL.x, y - WHEEL.y);
+  if (d <= WHEEL.inner) return 'center';
+  if (d <= WHEEL.outer) return sector(x - WHEEL.x, y - WHEEL.y);
+  const key = KEYS.find(k => x >= k.x && x < k.x + k.w && y >= k.y && y < k.y + k.h);
+  if (key) return key.id;
+  if (menu && state && x >= 15 && x < 113 && y >= 31 && y < 81) {
+    const row = Math.floor((y - 31) / 10);
+    if (row < state.tracks.length) return 'row:' + row;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousemove', e => {
+  const id = hit(e);
+  const next = id && !id.startsWith('row:') ? id : null;
+  if (next !== hover) { hover = next; draw(); }
+});
+canvas.addEventListener('mouseleave', () => { hover = null; draw(); });
+canvas.addEventListener('click', e => {
+  const id = hit(e);
+  if (!id || !state) return;
+  if (id.startsWith('row:')) {
+    selected = Number(id.slice(4));
+    menu = false;
+    return call('play', '?id=' + state.tracks[selected].id);
+  }
+  press(id);
+});
+
+document.addEventListener('keydown', e => {
+  if (!state) return;
+  const keys = {
+    ' ': 'playpause', ArrowLeft: 'prev', ArrowRight: 'next', m: 'menu', Enter: 'center',
+    o: 'order', z: 'undo', 1: 'fx:VOLUME_BOOST', 2: 'fx:FADE_IN', 3: 'fx:ECHO', 4: 'fx:BASS_BOOST'
+  };
+  if (menu && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    return move(e.key === 'ArrowUp' ? -1 : 1);
+  }
+  if (keys[e.key]) {
+    e.preventDefault();
+    press(keys[e.key]);
+  }
+});
+
+draw();
+call('state');
+setInterval(() => call('state'), 250);
+</script>
+</body>
+</html>
