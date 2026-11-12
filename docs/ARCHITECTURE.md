@@ -161,6 +161,17 @@ Subsystems behind it (the UI never touches them directly):
 - commands: `PlayCommand`, `PauseCommand`, `ResumeCommand`, `StopCommand`, `NextCommand`, `AddEffectCommand`, `RemoveEffectCommand`
 - only effects and pause can be undone. Undoing play, stop or next has no clear meaning, so those commands do not go to the history
 
+## 5a. Web player
+
+A second client next to `ConsoleUi`. It uses the same patterns, nothing in the facade had to change
+
+- `app/WebApp`: second composition root, starts the web server and opens the browser
+- `web/WebServer`: `com.sun.net.httpserver.HttpServer` from the JDK, serves `resources/web/index.html` and a small json api (`/api/state`, `/api/play`, `/api/playpause`, `/api/next`, `/api/prev`, `/api/effect`, `/api/order`, `/api/undo`)
+- `web/WebController`: turns clicks into `Command` objects through `CommandHistory`, so undo works the same as in the console
+- `web/WebState`: a `PlaybackListener` (Observer) that keeps the current track, position, pause flag and lyric line for the page. `LyricsDisplay` writes the lyric line into it
+- `audio/RealTimeSilentOutput`: no sound but the same speed as real playback, used with `--silent`
+- the page asks `/api/state` four times a second and draws a pixel mp3 player on a canvas
+
 ## 6. Rules
 
 - `app` knows only `command`, `facade`, `model`, `events` (to create listeners), `playback.order` (to choose an order) and `audio.effects.EffectType`
